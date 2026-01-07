@@ -67,7 +67,6 @@ def _timeout_wrapper(queue: multiprocessing.Queue, solution_name: str, solutions
         import tracemalloc
         import importlib.util
 
-        # Handle solution name to file name mapping
         SOLUTION_FILE_MAP = {
             'grasp_solution': 'grasp_swap_local_search_solution',
         }

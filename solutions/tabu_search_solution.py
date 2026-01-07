@@ -1,19 +1,26 @@
+"""
+Tabu search metaheuristic solution for power grid design problem.
+Uses tabu list to avoid cycling and explores neighborhood moves.
+"""
+
 import random
 from typing import List, Tuple
-
-
 from collections import deque
 
+
 class Dinic:
+    """Dinic's maximum flow algorithm implementation."""
     __slots__ = ("n", "g", "lvl", "it")
 
     def __init__(self, n: int):
+        """Initialize flow network with n nodes."""
         self.n = n
         self.g = [[] for _ in range(n)]
         self.lvl = [-1] * n
         self.it = [0] * n
 
     def add_edge(self, fr: int, to: int, cap: int) -> None:
+        """Add directed edge with capacity."""
         fwd = [to, cap, None]
         rev = [fr, 0, fwd]
         fwd[2] = rev
@@ -21,6 +28,7 @@ class Dinic:
         self.g[to].append(rev)
 
     def _bfs(self, s: int, t: int) -> bool:
+        """Build level graph using BFS."""
         for i in range(self.n):
             self.lvl[i] = -1
         q = deque([s])
@@ -34,6 +42,7 @@ class Dinic:
         return self.lvl[t] >= 0
 
     def _dfs(self, v: int, t: int, f: int) -> int:
+        """Find blocking flow using DFS."""
         if v == t:
             return f
         gv = self.g[v]
@@ -53,6 +62,7 @@ class Dinic:
         return 0
 
     def max_flow(self, s: int, t: int) -> int:
+        """Compute maximum flow from s to t."""
         flow = 0
         inf = 10 ** 18
         while self._bfs(s, t):
@@ -68,6 +78,7 @@ class Dinic:
 from typing import List, Tuple, Dict
 
 def _validate_inputs(n, edges, plants, consumers, kappa, u, g, d, B):
+    """Validate input parameters and return number of edges."""
     m = len(edges)
     if len(kappa) != m or len(u) != m:
         raise ValueError("edges, kappa, and u must have the same length")
@@ -78,12 +89,14 @@ def _validate_inputs(n, edges, plants, consumers, kappa, u, g, d, B):
     return m
 
 def _sum_list(a):
+    """Sum elements in list."""
     s = 0
     for x in a:
         s += x
     return s
 
 def _bit_iter(mm: int):
+    """Iterator over set bit positions in integer."""
     while mm:
         lb = mm & -mm
         yield lb.bit_length() - 1
@@ -96,10 +109,12 @@ def _worst_unmet_factory(n: int,
                          u: List[int],
                          g: List[int],
                          d: List[int]):
+    """Create worst-case unmet demand computation function with caching."""
     total_demand = _sum_list(d)
     cache: Dict[int, int] = {}
 
     def worst_unmet(mask: int) -> int:
+        """Compute worst-case unmet demand for given edge selection mask."""
         v = cache.get(mask)
         if v is not None:
             return v
@@ -136,6 +151,10 @@ def tabu_search_solution(
     d: List[int],
     B: int,
 ) -> Tuple[List[int], int]:
+    """
+    Solve power grid design using tabu search metaheuristic.
+    Returns selected edges and worst-case unmet demand.
+    """
     m = _validate_inputs(n, edges, plants, consumers, kappa, u, g, d, B)
     total_demand, worst_unmet = _worst_unmet_factory(n, edges, plants, consumers, u, g, d)
 
@@ -145,6 +164,7 @@ def tabu_search_solution(
     rng = random.Random(2)
 
     def better(z1, c1, mask1, z2, c2, mask2):
+        """Compare two solutions lexicographically."""
         if z1 != z2:
             return z1 < z2
         if c1 != c2:
@@ -173,10 +193,12 @@ def tabu_search_solution(
     tenure = 7 if m <= 120 else 10
 
     def is_tabu(i, t):
+        """Check if edge i is tabu at iteration t."""
         v = tabu_until.get(i)
         return v is not None and v > t
 
     def apply_move(add_i, rem_j, t):
+        """Apply move by adding/removing edges and update tabu list."""
         nonlocal mask, cost, cur_z
         if rem_j != -1:
             mask &= ~(1 << rem_j)
