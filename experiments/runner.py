@@ -67,8 +67,13 @@ def _timeout_wrapper(queue: multiprocessing.Queue, solution_name: str, solutions
         import tracemalloc
         import importlib.util
 
-        file_path = os.path.join(solutions_dir, f'{solution_name}.py')
-        spec = importlib.util.spec_from_file_location(solution_name, file_path)
+        # Handle solution name to file name mapping
+        SOLUTION_FILE_MAP = {
+            'grasp_solution': 'grasp_swap_local_search_solution',
+        }
+        file_name = SOLUTION_FILE_MAP.get(solution_name, solution_name)
+        file_path = os.path.join(solutions_dir, f'{file_name}.py')
+        spec = importlib.util.spec_from_file_location(file_name, file_path)
         if spec is None or spec.loader is None:
             raise ImportError(f"Failed to load module spec for {solution_name}")
 
@@ -145,6 +150,10 @@ def _run_with_timeout(solution_name: str, solutions_dir: str, args: Tuple, timeo
 class StressTestRunner:
     """Main stress testing framework orchestrator."""
 
+    SOLUTION_FILE_MAP = {
+        'grasp_solution': 'grasp_swap_local_search_solution',
+    }
+
     def __init__(self, config: ExperimentConfig):
         """
         Initialize stress test runner.
@@ -164,7 +173,8 @@ class StressTestRunner:
         print(f"\n[1/3] Loading {len(self.config.solutions_to_test)} solutions...")
 
         for solution_name in self.config.solutions_to_test:
-            file_path = os.path.join(solutions_dir, f'{solution_name}.py')
+            file_name = self.SOLUTION_FILE_MAP.get(solution_name, solution_name)
+            file_path = os.path.join(solutions_dir, f'{file_name}.py')
 
             if not os.path.exists(file_path):
                 raise FileNotFoundError(

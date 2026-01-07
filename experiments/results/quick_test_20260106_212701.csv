@@ -1,5 +1,0 @@
-instance_id,batch,mode,solution_name,status,runtime_seconds,memory_mb,objective_value,is_correct
-tiny_0_seed1000,tiny,random,greedy_solution,SUCCESS,0.000823,0.04,32,
-tiny_0_seed1000,tiny,random,pure_greedy_solution,SUCCESS,0.001063,0.04,32,True
-tiny_1_seed1001,tiny,random,greedy_solution,SUCCESS,0.000859,0.04,39,
-tiny_1_seed1001,tiny,random,pure_greedy_solution,SUCCESS,0.000799,0.04,39,True
