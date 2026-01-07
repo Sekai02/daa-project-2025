@@ -284,6 +284,3 @@ utils/
     └── validator.py          # Instance validation
 ```
 
-## Contact & Issues
-
-For questions or issues with the stress testing framework, refer to the main project documentation or contact the development team.
