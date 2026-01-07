@@ -1,17 +1,25 @@
+"""
+Brute force solution for power grid design problem.
+Exhaustively evaluates all edge subsets within budget.
+"""
+
 from collections import deque
 from typing import List, Tuple
 
 
 class Dinic:
+    """Dinic's maximum flow algorithm implementation."""
     __slots__ = ("n", "g", "lvl", "it")
 
     def __init__(self, n: int):
+        """Initialize flow network with n nodes."""
         self.n = n
         self.g = [[] for _ in range(n)]
         self.lvl = [-1] * n
         self.it = [0] * n
 
     def add_edge(self, fr: int, to: int, cap: int) -> None:
+        """Add directed edge with capacity."""
         fwd = [to, cap, None]
         rev = [fr, 0, fwd]
         fwd[2] = rev
@@ -19,6 +27,7 @@ class Dinic:
         self.g[to].append(rev)
 
     def _bfs(self, s: int, t: int) -> bool:
+        """Build level graph using BFS."""
         for i in range(self.n):
             self.lvl[i] = -1
         q = deque([s])
@@ -32,6 +41,7 @@ class Dinic:
         return self.lvl[t] >= 0
 
     def _dfs(self, v: int, t: int, f: int) -> int:
+        """Find blocking flow using DFS."""
         if v == t:
             return f
         gv = self.g[v]
@@ -51,6 +61,7 @@ class Dinic:
         return 0
 
     def max_flow(self, s: int, t: int) -> int:
+        """Compute maximum flow from s to t."""
         flow = 0
         inf = 10 ** 18
         while self._bfs(s, t):
@@ -75,6 +86,10 @@ def brute_force_solution(
     d: List[int],
     B: int,
 ) -> Tuple[List[int], int]:
+    """
+    Solve power grid design by exhaustive search over all edge subsets.
+    Returns selected edges and worst-case unmet demand.
+    """
     m = len(edges)
     if len(kappa) != m or len(u) != m:
         raise ValueError("edges, kappa, and u must have the same length")

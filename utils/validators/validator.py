@@ -18,7 +18,7 @@ from generator import Instance
 class ValidationError:
     """Single validation error or warning."""
 
-    severity: str  # "ERROR" or "WARNING"
+    severity: str
     message: str
     field: Optional[str] = None
 
@@ -85,11 +85,9 @@ def _validate_basic_constraints(instance: Instance) -> List[ValidationError]:
     """Validate basic constraints on instance parameters."""
     errors: List[ValidationError] = []
 
-    # Check n > 0
     if instance.n <= 0:
         errors.append(ValidationError("ERROR", "must be positive", "n"))
 
-    # Check list lengths
     m = len(instance.edges)
     if len(instance.kappa) != m:
         errors.append(ValidationError(
@@ -124,7 +122,6 @@ def _validate_basic_constraints(instance: Instance) -> List[ValidationError]:
             "d"
         ))
 
-    # Check non-negativity
     if instance.B < 0:
         errors.append(ValidationError("ERROR", "budget must be non-negative", "B"))
 
@@ -144,7 +141,6 @@ def _validate_basic_constraints(instance: Instance) -> List[ValidationError]:
         if demand < 0:
             errors.append(ValidationError("ERROR", f"demand at index {i} is negative: {demand}", "d"))
 
-    # Check no overlap between plants and consumers
     plants_set = set(instance.plants)
     consumers_set = set(instance.consumers)
     overlap = plants_set & consumers_set
@@ -155,7 +151,6 @@ def _validate_basic_constraints(instance: Instance) -> List[ValidationError]:
             "plants/consumers"
         ))
 
-    # Check plants + consumers <= n
     if len(plants_set) + len(consumers_set) > instance.n:
         errors.append(ValidationError(
             "ERROR",
@@ -163,7 +158,6 @@ def _validate_basic_constraints(instance: Instance) -> List[ValidationError]:
             "n"
         ))
 
-    # Check edge endpoints are in valid range
     for i, (a, b) in enumerate(instance.edges):
         if a < 0 or a >= instance.n:
             errors.append(ValidationError(
@@ -178,7 +172,6 @@ def _validate_basic_constraints(instance: Instance) -> List[ValidationError]:
                 "edges"
             ))
 
-    # Check for duplicate node IDs in plants/consumers
     if len(plants_set) != len(instance.plants):
         errors.append(ValidationError("WARNING", "contains duplicate node IDs", "plants"))
     if len(consumers_set) != len(instance.consumers):

@@ -1,4 +1,3 @@
-# generator.py
 """
 Random instance generators for:
 Robust Budget-Constrained Power Grid Design Under Single-Plant Failures.
@@ -40,62 +39,47 @@ Edge = Tuple[int, int]
 
 @dataclass(frozen=True)
 class GeneratorConfig:
-    # --- size / roles ---
+    """Configuration for instance generation."""
+
     n: int = 20
     num_plants: int = 3
     num_consumers: int = 6
 
-    # --- edge generation ---
-    # You may specify either:
-    #   - m_edges (exact #edges), or
-    #   - edge_prob (Erdos-Renyi over ordered pairs)
     m_edges: Optional[int] = 60
     edge_prob: Optional[float] = None
     allow_self_loops: bool = False
 
-    # --- value ranges ---
-    # Costs and capacities are integers in [min, max]
     cost_min: int = 1
     cost_max: int = 25
     cap_min: int = 1
     cap_max: int = 30
 
-    # Demands and plant capacities
     demand_min: int = 5
     demand_max: int = 25
     plant_cap_min: int = 10
     plant_cap_max: int = 60
 
-    # Optional: allow some zero-cost edges (useful to mirror reductions / special cases)
     zero_cost_edge_prob: float = 0.0
 
-    # --- budget ---
-    # If budget is None, it is derived from total candidate cost via budget_ratio in [0,1].
     budget: Optional[int] = None
-    budget_ratio: float = 0.25  # typical: 0.15..0.40
-    budget_min: int = 0         # clamp lower bound
-    budget_max: Optional[int] = None  # clamp upper bound if desired
+    budget_ratio: float = 0.25
+    budget_min: int = 0
+    budget_max: Optional[int] = None
 
-    # --- structural constraints ---
     ensure_each_consumer_has_incoming: bool = True
     ensure_each_plant_has_outgoing: bool = True
-    ensure_min_connectivity: bool = True  # adds a small backbone if needed
+    ensure_min_connectivity: bool = True
 
-    # --- scaling / feasibility nudges ---
-    # If True, generator caps are nudged upward so that *with all edges built*
-    # total generation can cover total demand even under one plant failure (usually).
     nudge_generation_for_robustness: bool = True
-    robustness_slack: float = 1.10  # >1 makes it easier to satisfy demand
+    robustness_slack: float = 1.10
 
-    # --- mode ---
-    # "random": generic
-    # "bottleneck": introduces chokepoints (tends to be harder)
-    # "two_layer": plants -> transit -> consumers layered graph
     mode: str = "random"
 
 
 @dataclass
 class Instance:
+    """Problem instance for power grid design."""
+
     n: int
     edges: List[Edge]
     plants: List[int]
@@ -108,10 +92,12 @@ class Instance:
     meta: Dict[str, Any]
 
     def to_solver_args(self):
+        """Convert instance to solver function arguments tuple."""
         return (self.n, self.edges, self.plants, self.consumers, self.kappa, self.u, self.g, self.d, self.B)
 
 
 def _clamp(x: int, lo: int, hi: Optional[int]) -> int:
+    """Clamp value x to range [lo, hi]."""
     if x < lo:
         return lo
     if hi is not None and x > hi:
@@ -120,6 +106,7 @@ def _clamp(x: int, lo: int, hi: Optional[int]) -> int:
 
 
 def _sample_distinct(rng: random.Random, n: int, k: int) -> List[int]:
+    """Sample k distinct integers from range [0, n)."""
     if k < 0 or k > n:
         raise ValueError(f"cannot sample {k} distinct values from [0,{n})")
     arr = list(range(n))
@@ -128,6 +115,7 @@ def _sample_distinct(rng: random.Random, n: int, k: int) -> List[int]:
 
 
 def _make_roles(cfg: GeneratorConfig, rng: random.Random) -> Tuple[List[int], List[int], List[int]]:
+    """Assign nodes to roles: plants, consumers, transit."""
     if cfg.n <= 0:
         raise ValueError("n must be > 0")
     if cfg.num_plants <= 0:
@@ -150,38 +138,37 @@ def _make_roles(cfg: GeneratorConfig, rng: random.Random) -> Tuple[List[int], Li
 
 
 def _rand_int(rng: random.Random, lo: int, hi: int) -> int:
+    """Generate random integer in range [lo, hi]."""
     if lo > hi:
         lo, hi = hi, lo
     return rng.randint(lo, hi)
 
 
 def _generate_demands(cfg: GeneratorConfig, rng: random.Random, consumers: List[int]) -> List[int]:
+    """Generate demand values for consumers."""
     d = [_rand_int(rng, cfg.demand_min, cfg.demand_max) for _ in consumers]
     return d
 
 
 def _generate_generation(cfg: GeneratorConfig, rng: random.Random, plants: List[int], demands: List[int]) -> List[int]:
+    """Generate generation capacity values for plants."""
     g = [_rand_int(rng, cfg.plant_cap_min, cfg.plant_cap_max) for _ in plants]
 
     if not cfg.nudge_generation_for_robustness or len(plants) <= 1:
         return g
 
     total_demand = sum(demands)
-    # Robust target: after removing the largest single plant? (worst case is failing a big plant)
-    # We'll nudge so that sum(g) - max(g) >= slack * total_demand, if possible.
     target = int(cfg.robustness_slack * total_demand)
     cur = sum(g) - max(g)
     if cur >= target:
         return g
 
-    # Nudge by increasing smaller plants first (keeps max(g) from dominating).
     need = target - cur
-    idx_sorted = sorted(range(len(g)), key=lambda i: g[i])  # smallest first
+    idx_sorted = sorted(range(len(g)), key=lambda i: g[i])
     g2 = g[:]
     i = 0
     while need > 0 and i < len(idx_sorted):
         pi = idx_sorted[i]
-        # raise up to plant_cap_max
         room = cfg.plant_cap_max - g2[pi]
         if room > 0:
             add = min(room, need)
@@ -192,6 +179,7 @@ def _generate_generation(cfg: GeneratorConfig, rng: random.Random, plants: List[
 
 
 def _all_possible_arcs(n: int, allow_self_loops: bool) -> List[Edge]:
+    """Generate all possible directed arcs for n nodes."""
     arcs: List[Edge] = []
     for a in range(n):
         for b in range(n):
@@ -202,7 +190,7 @@ def _all_possible_arcs(n: int, allow_self_loops: bool) -> List[Edge]:
 
 
 def _choose_edges_random(cfg: GeneratorConfig, rng: random.Random) -> List[Edge]:
-    # Choose edges either by exact m or by probability over all ordered pairs.
+    """Choose candidate edges based on configuration."""
     if cfg.m_edges is None and cfg.edge_prob is None:
         raise ValueError("Specify either m_edges or edge_prob.")
     if cfg.m_edges is not None and cfg.edge_prob is not None:
@@ -215,12 +203,10 @@ def _choose_edges_random(cfg: GeneratorConfig, rng: random.Random) -> List[Edge]
         if p < 0.0 or p > 1.0:
             raise ValueError("edge_prob must be in [0,1]")
         edges = [e for e in candidates if rng.random() < p]
-        # Keep at least 1 edge to avoid pathological empty candidate sets
         if not edges and candidates:
             edges = [candidates[rng.randrange(len(candidates))]]
         return edges
 
-    # exact m_edges
     m = cfg.m_edges
     if m is None:
         raise ValueError("internal: m_edges unexpectedly None")
@@ -233,13 +219,11 @@ def _choose_edges_random(cfg: GeneratorConfig, rng: random.Random) -> List[Edge]
 
 
 def _ensure_backbone(cfg: GeneratorConfig, rng: random.Random, plants: List[int], consumers: List[int], transit: List[int], edges: List[Edge]) -> List[Edge]:
-    # Adds a small set of arcs to reduce trivial disconnection:
-    # - connect each plant to some transit/consumer
-    # - connect some transit to consumers
-    # - optionally chain transit nodes
+    """Add basic connectivity backbone to edge set."""
     edge_set = set(edges)
 
     def add(a: int, b: int):
+        """Add edge to set if valid."""
         if not cfg.allow_self_loops and a == b:
             return
         edge_set.add((a, b))
@@ -247,23 +231,19 @@ def _ensure_backbone(cfg: GeneratorConfig, rng: random.Random, plants: List[int]
     if not cfg.ensure_min_connectivity:
         return list(edge_set)
 
-    # Choose a "hub" among transit if possible, else among consumers.
     hub: int
     if transit:
         hub = transit[0]
     else:
         hub = consumers[0]
 
-    # Plants -> hub
     for p in plants:
         add(p, hub)
 
-    # Hub -> each consumer (or via transit chain if many)
     for c in consumers:
         if hub != c:
             add(hub, c)
 
-    # If there are multiple transit nodes, add a few chain edges
     if len(transit) >= 2:
         for i in range(len(transit) - 1):
             if rng.random() < 0.6:
@@ -273,6 +253,7 @@ def _ensure_backbone(cfg: GeneratorConfig, rng: random.Random, plants: List[int]
 
 
 def _ensure_role_degrees(cfg: GeneratorConfig, rng: random.Random, plants: List[int], consumers: List[int], transit: List[int], edges: List[Edge]) -> List[Edge]:
+    """Ensure each node has appropriate in/out degree based on role."""
     edge_set = set(edges)
 
     out_deg = [0] * cfg.n
@@ -282,6 +263,7 @@ def _ensure_role_degrees(cfg: GeneratorConfig, rng: random.Random, plants: List[
         in_deg[b] += 1
 
     def add_edge(a: int, b: int):
+        """Add edge to set and update degree counts."""
         if not cfg.allow_self_loops and a == b:
             return
         if (a, b) in edge_set:
@@ -290,22 +272,18 @@ def _ensure_role_degrees(cfg: GeneratorConfig, rng: random.Random, plants: List[
         out_deg[a] += 1
         in_deg[b] += 1
 
-    # Ensure each consumer has at least one incoming
     if cfg.ensure_each_consumer_has_incoming:
         for c in consumers:
             if in_deg[c] > 0:
                 continue
-            # prefer from transit, else from plants
             src_pool = transit if transit else plants
             a = src_pool[rng.randrange(len(src_pool))]
             add_edge(a, c)
 
-    # Ensure each plant has at least one outgoing
     if cfg.ensure_each_plant_has_outgoing:
         for p in plants:
             if out_deg[p] > 0:
                 continue
-            # prefer to transit or consumers
             dst_pool = transit if transit else consumers
             b = dst_pool[rng.randrange(len(dst_pool))]
             add_edge(p, b)
@@ -314,28 +292,19 @@ def _ensure_role_degrees(cfg: GeneratorConfig, rng: random.Random, plants: List[
 
 
 def _assign_edge_values(cfg: GeneratorConfig, rng: random.Random, edges: List[Edge], total_demand: int) -> Tuple[List[int], List[int]]:
-    # Capacities and costs.
-    # Capacity scale: sometimes tie to demand to avoid trivial "always unmet" instances.
-    # We keep this simple and integer-valued.
+    """Assign cost and capacity values to edges."""
     kappa: List[int] = []
     u: List[int] = []
 
-    # demand-derived cap bounds (optional soft scaling)
-    # If demand is large, permit larger caps even if cap_max is small.
     soft_cap_max = max(cfg.cap_max, max(1, total_demand // 2))
 
     for _ in edges:
-        # costs
         if cfg.zero_cost_edge_prob > 0.0 and rng.random() < cfg.zero_cost_edge_prob:
             k = 0
         else:
             k = _rand_int(rng, cfg.cost_min, cfg.cost_max)
 
-        # capacities
         cap_hi = max(cfg.cap_min, min(soft_cap_max, cfg.cap_max))
-        # If cfg.cap_max is already reasonable, cap_hi==cfg.cap_max.
-        # If cap_max is tiny relative to demand, cap_hi==cfg.cap_max anyway (by min).
-        # Users can raise cap_max if they want.
         cap = _rand_int(rng, cfg.cap_min, cap_hi)
 
         kappa.append(k)
@@ -345,13 +314,12 @@ def _assign_edge_values(cfg: GeneratorConfig, rng: random.Random, edges: List[Ed
 
 
 def _derive_budget(cfg: GeneratorConfig, rng: random.Random, kappa: List[int]) -> int:
+    """Derive budget value from configuration and edge costs."""
     if cfg.budget is not None:
         return _clamp(int(cfg.budget), cfg.budget_min, cfg.budget_max)
 
     total_cost = sum(kappa)
-    # If many zero-cost edges, total_cost might be small.
     base = int(cfg.budget_ratio * total_cost)
-    # Add slight randomness around base to diversify instances
     jitter = int(0.08 * total_cost)
     if jitter > 0:
         base = base + rng.randint(-jitter, jitter)
@@ -359,7 +327,7 @@ def _derive_budget(cfg: GeneratorConfig, rng: random.Random, kappa: List[int]) -
 
 
 def _mode_transform(cfg: GeneratorConfig, rng: random.Random, plants: List[int], consumers: List[int], transit: List[int], edges: List[Edge]) -> List[Edge]:
-    # Apply structured patterns after initial edge selection.
+    """Apply mode-specific transformations to edge set."""
     mode = (cfg.mode or "random").lower()
     if mode == "random":
         return edges
@@ -367,29 +335,24 @@ def _mode_transform(cfg: GeneratorConfig, rng: random.Random, plants: List[int],
     edge_set = set(edges)
 
     def add(a: int, b: int):
+        """Add edge to set if valid."""
         if not cfg.allow_self_loops and a == b:
             return
         edge_set.add((a, b))
 
     if mode == "two_layer":
-        # enforce a layered graph: plants -> (transit) -> consumers, plus a few lateral edges
-        # remove edges that violate layers (softly, by rebuilding a fresh set)
         edge_set = set()
         mid = transit[:] if transit else []
         if not mid:
-            # if no transit, treat consumers as mid; still keep plants->consumers
             mid = consumers[:]
 
-        # plants -> mid
         for p in plants:
             for _ in range(max(1, len(mid) // 2)):
                 add(p, mid[rng.randrange(len(mid))])
 
-        # mid -> consumers
         for c in consumers:
             add(mid[rng.randrange(len(mid))], c)
 
-        # a few extra edges within mid for alternative routing
         if len(mid) >= 2:
             for _ in range(min(10, len(mid) * 2)):
                 a = mid[rng.randrange(len(mid))]
@@ -398,7 +361,6 @@ def _mode_transform(cfg: GeneratorConfig, rng: random.Random, plants: List[int],
                     add(a, b)
 
     elif mode == "bottleneck":
-        # create chokepoints: choose 1-2 bottleneck transit nodes; route most paths through them
         if transit:
             bn = [transit[rng.randrange(len(transit))]]
             if len(transit) >= 2 and rng.random() < 0.6:
@@ -406,21 +368,17 @@ def _mode_transform(cfg: GeneratorConfig, rng: random.Random, plants: List[int],
                 if bn2 != bn[0]:
                     bn.append(bn2)
         else:
-            # fallback: pick some non-plant nodes among consumers
             bn = [consumers[rng.randrange(len(consumers))]]
 
         edge_set = set()
 
-        # plants -> bottleneck(s)
         for p in plants:
             for b in bn:
                 add(p, b)
 
-        # bottleneck(s) -> consumers
         for c in consumers:
             add(bn[rng.randrange(len(bn))], c)
 
-        # optionally add sparse alternatives to avoid total collapse
         for _ in range(max(1, cfg.n // 3)):
             a = rng.randrange(cfg.n)
             b = rng.randrange(cfg.n)
@@ -434,26 +392,22 @@ def _mode_transform(cfg: GeneratorConfig, rng: random.Random, plants: List[int],
 
 
 def generate_instance(cfg: GeneratorConfig, seed: Optional[int] = None) -> Instance:
+    """Generate a random problem instance based on configuration."""
     rng = random.Random(seed)
 
     plants, consumers, transit = _make_roles(cfg, rng)
     demands = _generate_demands(cfg, rng, consumers)
     gen_caps = _generate_generation(cfg, rng, plants, demands)
 
-    # Step 1: raw edge generation
     edges = _choose_edges_random(cfg, rng)
 
-    # Step 2: mode-specific structure (optional)
     edges = _mode_transform(cfg, rng, plants, consumers, transit, edges)
 
-    # Step 3: enforce basic connectivity expectations
     edges = _ensure_backbone(cfg, rng, plants, consumers, transit, edges)
     edges = _ensure_role_degrees(cfg, rng, plants, consumers, transit, edges)
 
-    # Normalize edges ordering for reproducibility (independent of set iteration ordering)
     edges = sorted(set(edges))
 
-    # Assign values
     total_demand = sum(demands)
     kappa, caps = _assign_edge_values(cfg, rng, edges, total_demand)
     B = _derive_budget(cfg, rng, kappa)
@@ -483,6 +437,7 @@ def generate_instance(cfg: GeneratorConfig, seed: Optional[int] = None) -> Insta
 
 
 def _instance_to_jsonable(inst: Instance) -> Dict[str, Any]:
+    """Convert instance to JSON-serializable dictionary."""
     return {
         "n": inst.n,
         "edges": inst.edges,
@@ -498,8 +453,7 @@ def _instance_to_jsonable(inst: Instance) -> Dict[str, Any]:
 
 
 def _print_python_literal(inst: Instance) -> None:
-    # Convenient for copy/paste into a REPL or a harness script.
-    # Produces variables matching the solver signature.
+    """Print instance as Python literals for REPL usage."""
     print(f"n = {inst.n}")
     print(f"edges = {inst.edges}")
     print(f"plants = {inst.plants}")
@@ -510,13 +464,12 @@ def _print_python_literal(inst: Instance) -> None:
     print(f"d = {inst.d}")
     print(f"B = {inst.B}")
     print()
-    print("# solver args:")
     print("args = (n, edges, plants, consumers, kappa, u, g, d, B)")
-    print("# meta:")
     print(f"meta = {json.dumps(inst.meta, indent=2)}")
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
+    """Build command-line argument parser."""
     p = argparse.ArgumentParser(description="Generate random instances for the robust budget-constrained power grid design problem.")
     p.add_argument("--seed", type=int, default=None, help="Random seed (int).")
     p.add_argument("--n", type=int, default=20, help="Number of nodes.")
@@ -550,6 +503,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: List[str]) -> int:
+    """Main entry point for CLI."""
     ap = _build_arg_parser()
     args = ap.parse_args(argv)
 
