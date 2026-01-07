@@ -1,0 +1,33 @@
+{
+  "experiment_name": "small_correctness_test",
+  "description": "Small instances for correctness verification",
+  "timeout_per_instance": 30,
+  "random_seed": 42,
+  "batches": [
+    {
+      "batch_name": "tiny_random",
+      "description": "Tiny random instances (n=8, m=20)",
+      "count": 5,
+      "generator_config": {
+        "n": 8,
+        "num_plants": 2,
+        "num_consumers": 2,
+        "m_edges": 20,
+        "mode": "random",
+        "budget_ratio": 0.25
+      },
+      "seed_start": 1000
+    }
+  ],
+  "solutions_to_test": [
+    "brute_force_solution",
+    "greedy_solution",
+    "pure_greedy_solution"
+  ],
+  "reference_solution": "brute_force_solution",
+  "output": {
+    "save_results": true,
+    "save_charts": true,
+    "formats": ["json", "csv"]
+  }
+}

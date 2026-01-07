@@ -1,0 +1,67 @@
+{
+  "experiment_name": "quick_test",
+  "timestamp": "20260106_212701",
+  "config": {
+    "experiment_name": "quick_test",
+    "timeout_per_instance": 10,
+    "solutions_to_test": [
+      "greedy_solution",
+      "pure_greedy_solution"
+    ],
+    "reference_solution": "greedy_solution"
+  },
+  "summary": {
+    "total_batches": 1,
+    "total_instances": 2,
+    "validation_failures": 0
+  },
+  "batches": [
+    {
+      "batch_name": "tiny",
+      "instances": [
+        {
+          "instance_id": "tiny_0_seed1000",
+          "solutions": {
+            "greedy_solution": {
+              "status": "SUCCESS",
+              "runtime_seconds": 0.0008229499999288237,
+              "memory_mb": 0.04129791259765625,
+              "objective_value": 32,
+              "is_correct": null,
+              "error_message": null
+            },
+            "pure_greedy_solution": {
+              "status": "SUCCESS",
+              "runtime_seconds": 0.0010633870006131474,
+              "memory_mb": 0.041259765625,
+              "objective_value": 32,
+              "is_correct": true,
+              "error_message": null
+            }
+          }
+        },
+        {
+          "instance_id": "tiny_1_seed1001",
+          "solutions": {
+            "greedy_solution": {
+              "status": "SUCCESS",
+              "runtime_seconds": 0.0008591090008849278,
+              "memory_mb": 0.04135894775390625,
+              "objective_value": 39,
+              "is_correct": null,
+              "error_message": null
+            },
+            "pure_greedy_solution": {
+              "status": "SUCCESS",
+              "runtime_seconds": 0.0007989290006662486,
+              "memory_mb": 0.04132080078125,
+              "objective_value": 39,
+              "is_correct": true,
+              "error_message": null
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
