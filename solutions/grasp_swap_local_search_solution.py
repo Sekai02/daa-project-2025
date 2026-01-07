@@ -1,19 +1,26 @@
+"""
+GRASP with swap-based local search solution for power grid design problem.
+Combines greedy randomized construction with local search improvement.
+"""
+
 import random
 from typing import List, Tuple
-
-
 from collections import deque
 
+
 class Dinic:
+    """Dinic's maximum flow algorithm implementation."""
     __slots__ = ("n", "g", "lvl", "it")
 
     def __init__(self, n: int):
+        """Initialize flow network with n nodes."""
         self.n = n
         self.g = [[] for _ in range(n)]
         self.lvl = [-1] * n
         self.it = [0] * n
 
     def add_edge(self, fr: int, to: int, cap: int) -> None:
+        """Add directed edge with capacity."""
         fwd = [to, cap, None]
         rev = [fr, 0, fwd]
         fwd[2] = rev
@@ -21,6 +28,7 @@ class Dinic:
         self.g[to].append(rev)
 
     def _bfs(self, s: int, t: int) -> bool:
+        """Build level graph using BFS."""
         for i in range(self.n):
             self.lvl[i] = -1
         q = deque([s])
@@ -34,6 +42,7 @@ class Dinic:
         return self.lvl[t] >= 0
 
     def _dfs(self, v: int, t: int, f: int) -> int:
+        """Find blocking flow using DFS."""
         if v == t:
             return f
         gv = self.g[v]
@@ -53,6 +62,7 @@ class Dinic:
         return 0
 
     def max_flow(self, s: int, t: int) -> int:
+        """Compute maximum flow from s to t."""
         flow = 0
         inf = 10 ** 18
         while self._bfs(s, t):
@@ -68,6 +78,7 @@ class Dinic:
 from typing import List, Tuple, Dict
 
 def _validate_inputs(n, edges, plants, consumers, kappa, u, g, d, B):
+    """Validate input parameters and return number of edges."""
     m = len(edges)
     if len(kappa) != m or len(u) != m:
         raise ValueError("edges, kappa, and u must have the same length")
@@ -78,12 +89,14 @@ def _validate_inputs(n, edges, plants, consumers, kappa, u, g, d, B):
     return m
 
 def _sum_list(a):
+    """Sum elements in list."""
     s = 0
     for x in a:
         s += x
     return s
 
 def _bit_iter(mm: int):
+    """Iterator over set bit positions in integer."""
     while mm:
         lb = mm & -mm
         yield lb.bit_length() - 1
@@ -96,10 +109,12 @@ def _worst_unmet_factory(n: int,
                          u: List[int],
                          g: List[int],
                          d: List[int]):
+    """Create worst-case unmet demand computation function with caching."""
     total_demand = _sum_list(d)
     cache: Dict[int, int] = {}
 
     def worst_unmet(mask: int) -> int:
+        """Compute worst-case unmet demand for given edge selection mask."""
         v = cache.get(mask)
         if v is not None:
             return v
@@ -126,6 +141,7 @@ def _worst_unmet_factory(n: int,
 
 
 def _local_search_swap(m: int, kappa: List[int], B: int, worst_unmet, mask: int, cost: int, z: int, rng: random.Random) -> Tuple[int, int, int]:
+    """Apply local search with swap moves to improve solution."""
     if m == 0:
         return mask, cost, z
 
@@ -228,6 +244,10 @@ def grasp_solution(
     d: List[int],
     B: int,
 ) -> Tuple[List[int], int]:
+    """
+    Solve power grid design using GRASP with local search.
+    Returns selected edges and worst-case unmet demand.
+    """
     m = _validate_inputs(n, edges, plants, consumers, kappa, u, g, d, B)
     total_demand, worst_unmet = _worst_unmet_factory(n, edges, plants, consumers, u, g, d)
 
